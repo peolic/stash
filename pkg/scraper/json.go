@@ -4,12 +4,15 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/stashapp/stash/pkg/logger"
 	"github.com/stashapp/stash/pkg/models"
 	"github.com/tidwall/gjson"
 )
+
+var patternJSONPSyntax = regexp.MustCompile(`(?s)^[^{[]+\((.+)\);?$`)
 
 type jsonScraper struct {
 	scraper      scraperTypeConfig
@@ -60,7 +63,11 @@ func (s *jsonScraper) loadURL(url string) (string, error) {
 
 	docStr := string(doc)
 	if !gjson.Valid(docStr) {
-		return "", errors.New("not valid json")
+		// attempt to convert JSONP to JSON
+		docStr = patternJSONPSyntax.ReplaceAllString(docStr, "$1")
+		if !gjson.Valid(docStr) {
+			return "", errors.New("not valid json")
+		}
 	}
 
 	if err == nil && s.config.DebugOptions != nil && s.config.DebugOptions.PrintHTML {
